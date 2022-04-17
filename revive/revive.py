@@ -48,7 +48,12 @@ import lyricsgenius
 #     temp = ''
 #     for i in code:
 
-messagehistory = defaultdict(list)
+class Message:
+    def __init__(self, snipe: str, *, data: discord.Message):
+        self.data = data
+        self.snipe = snipe
+
+messagehistory = defaultdict(lambda: defaultdict(list))
 
 helppages = []
 
@@ -1716,8 +1721,9 @@ class Utility(commands.Cog):
     async def purge(self, ctx: commands.Context):
         try:
             if ctx.message.author.guild_permissions.administrator:
-                for i in messagehistory:
-                    await i.delete()
+                for i in messagehistory[str(ctx.message.guild.id)][str(ctx.message.channel.id)]:
+                    await i.data.delete()
+                messagehistory[str(ctx.message.guild.id)][str(ctx.message.channel.id)].clear()
             else:
                 await ctx.send('You need admin for that...')
         except:
@@ -1869,7 +1875,6 @@ class Snipe(commands.Cog):
 
     @commands.command()
     async def snipe(self, ctx):
-        if str(ctx.message.guild.id) in lastonehundredmessages:
             maxindex = len(lastonehundredmessages[str(ctx.message.guild.id)]) - 1
             format = ''
             ticker = 0
@@ -1926,8 +1931,6 @@ class Snipe(commands.Cog):
                     await message.edit(embed = embed)
                 
                 await reaction.remove(author)
-        else:
-            return
 
 class Fun(commands.Cog):
     @commands.command(aliases = ["tc", "text"])
@@ -2091,13 +2094,18 @@ async def on_bulk_message_delete(messages):
             lastonehundredmessages[str(message.guild.id)] = [f'`{message.content}` sent by `{message.author}`\n']
 
 @yb.event
-async def on_message_send(message):
+async def on_message(message):
     if str(message.guild.id) in messagehistory:
-        messagehistory[str(message.guild.id)].insert(0, f'`{message.content}` sent by `{message.author}`\n')
-        while len(messagehistory[str(message.guild.id)]) >= 101:
-            messagehistory[str(message.guild.id)].pop()
+        if str(message.channel.id) in messagehistory[str(message.guild.id)]:
+            messagehistory[str(message.guild.id)][str(message.channel.id)].insert(0, Message(snipe = f'`{message.content}` sent by `{message.author} in #{message.channel}`\n', data = message))
+            while len(messagehistory[str(message.guild.id)][str(message.channel.id)]) >= 101:
+                messagehistory[str(message.guild.id)][str(message.channel.id)].pop()
+        else:
+            messagehistory[str(message.guild.id)][str(message.channel.id)] = [Message(snipe = f'`{message.content}` sent by `{message.author} in #{message.channel}`\n', data = message)]
     else:
-        messagehistory[str(message.guild.id)] = [f'`{message.content}` sent by `{message.author}`\n']
+        messagehistory[str(message.guild.id)][str(message.channel.id)] = [Message(snipe = f'`{message.content}` sent by `{message.author} in #{message.channel}`\n', data = message)]
+
+    await yb.process_commands(message)
 
 @yb.event
 async def on_guild_join(guild):
